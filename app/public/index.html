@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS ECS Canary Deployment — Live Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080f1e;
+      --surface: #0d1829;
+      --surface-2: #121f35;
+      --border: #1e3050;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --v1: #3b82f6;
+      --v1-dim: rgba(59,130,246,0.12);
+      --v1-glow: rgba(59,130,246,0.35);
+      --v2: #f59e0b;
+      --v2-dim: rgba(245,158,11,0.12);
+      --v2-glow: rgba(245,158,11,0.35);
+      --green: #22c55e;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0a1628 0%, #0d1f3c 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 14px; }
+
+    .aws-badge {
+      background: linear-gradient(135deg, #ff9900, #ff6600);
+      color: #000;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    header h1 span { color: var(--v2); }
+
+    .live-dot {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .live-dot::before {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse-green 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-green {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+    }
+
+    /* ── Main layout ── */
+    main {
+      flex: 1;
+      padding: 24px 32px;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      grid-template-rows: auto auto 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title svg { width: 13px; height: 13px; }
+
+    /* ── Current Request ── */
+    .current-request {
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .version-badge.v1 {
+      background: var(--v1-dim);
+      border: 1px solid var(--v1);
+      color: var(--v1);
+    }
+
+    .version-badge.v2 {
+      background: var(--v2-dim);
+      border: 1px solid var(--v2);
+      color: var(--v2);
+    }
+
+    .version-display {
+      font-size: 56px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+      margin-bottom: 6px;
+    }
+
+    .version-display.v1 {
+      color: var(--v1);
+      text-shadow: 0 0 40px var(--v1-glow);
+    }
+
+    .version-display.v2 {
+      color: var(--v2);
+      text-shadow: 0 0 40px var(--v2-glow);
+    }
+
+    .version-type {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 28px;
+      transition: color 0.3s;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .meta-value {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: #94a3b8;
+      word-break: break-all;
+    }
+
+    .meta-value.highlight {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ── Flash animation on update ── */
+    @keyframes flash-in {
+      0% { opacity: 0; transform: translateY(-4px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .flash { animation: flash-in 0.25s ease forwards; }
+
+    /* ── Traffic Distribution ── */
+    .traffic-card { grid-column: 2; grid-row: 1; }
+
+    .split-bar-wrap {
+      margin-bottom: 18px;
+    }
+
+    .split-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .split-label {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .split-label.v1 { color: var(--v1); }
+    .split-label.v2 { color: var(--v2); }
+
+    .split-bar {
+      height: 28px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      overflow: hidden;
+      display: flex;
+      border: 1px solid var(--border);
+    }
+
+    .split-fill-v1 {
+      height: 100%;
+      background: linear-gradient(90deg, #1d4ed8, var(--v1));
+      transition: width 0.6s cubic-bezier(.34,1.56,.64,1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .split-fill-v2 {
+      height: 100%;
+      background: linear-gradient(90deg, var(--v2), #d97706);
+      transition: width 0.6s cubic-bezier(.34,1.56,.64,1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .split-pct {
+      font-size: 11px;
+      font-weight: 800;
+      color: rgba(255,255,255,0.9);
+      white-space: nowrap;
+      padding: 0 8px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .stat-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .stat-box-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-box-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-box-value.v1 { color: var(--v1); }
+    .stat-box-value.v2 { color: var(--v2); }
+
+    /* ── Container Grid ── */
+    .containers-card { grid-column: 2; grid-row: 2; }
+
+    .containers-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .container-node {
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 180px;
+      flex: 1;
+      transition: all 0.25s ease;
+      cursor: default;
+      background: var(--surface-2);
+    }
+
+    .container-node.v1 { border-color: rgba(59,130,246,0.25); }
+    .container-node.v2 { border-color: rgba(245,158,11,0.25); }
+
+    .container-node.active-v1 {
+      border-color: var(--v1);
+      background: var(--v1-dim);
+      box-shadow: 0 0 20px var(--v1-glow), inset 0 0 20px rgba(59,130,246,.05);
+      animation: node-pulse-v1 0.6s ease;
+    }
+
+    .container-node.active-v2 {
+      border-color: var(--v2);
+      background: var(--v2-dim);
+      box-shadow: 0 0 20px var(--v2-glow), inset 0 0 20px rgba(245,158,11,.05);
+      animation: node-pulse-v2 0.6s ease;
+    }
+
+    @keyframes node-pulse-v1 {
+      0% { box-shadow: 0 0 0 0 var(--v1-glow); }
+      50% { box-shadow: 0 0 30px 8px var(--v1-glow); }
+      100% { box-shadow: 0 0 20px var(--v1-glow); }
+    }
+
+    @keyframes node-pulse-v2 {
+      0% { box-shadow: 0 0 0 0 var(--v2-glow); }
+      50% { box-shadow: 0 0 30px 8px var(--v2-glow); }
+      100% { box-shadow: 0 0 20px var(--v2-glow); }
+    }
+
+    .node-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .node-type-badge {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .node-type-badge.stable {
+      background: rgba(59,130,246,0.2);
+      color: var(--v1);
+    }
+
+    .node-type-badge.canary {
+      background: rgba(245,158,11,0.2);
+      color: var(--v2);
+    }
+
+    .node-req-count {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .node-id {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      color: #475569;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .node-id.active {
+      color: #94a3b8;
+    }
+
+    .node-version {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    /* ── Request History ── */
+    .history-card { grid-column: 1 / -1; }
+
+    .history-stream {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-content: flex-start;
+      min-height: 60px;
+    }
+
+    .req-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      animation: pill-in 0.2s ease forwards;
+      cursor: default;
+    }
+
+    .req-pill.v1 {
+      background: var(--v1-dim);
+      border: 1px solid rgba(59,130,246,0.3);
+      color: #93c5fd;
+    }
+
+    .req-pill.v2 {
+      background: var(--v2-dim);
+      border: 1px solid rgba(245,158,11,0.3);
+      color: #fcd34d;
+    }
+
+    @keyframes pill-in {
+      from { opacity: 0; transform: scale(0.8) translateY(4px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .req-pill .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+
+    .req-pill.v1 .dot { background: var(--v1); }
+    .req-pill.v2 .dot { background: var(--v2); }
+
+    /* ── Paused overlay ── */
+    .paused-banner {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .paused-banner.visible { display: block; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 12px 0;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .btn {
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      transition: all 0.15s;
+    }
+
+    .btn:hover { border-color: #334155; background: #1e293b; }
+    .btn.danger { border-color: rgba(239,68,68,.3); color: #fca5a5; }
+    .btn.danger:hover { background: rgba(239,68,68,.1); }
+
+    .interval-label {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    select.interval-select {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 16px;
+      }
+      .current-request { grid-row: auto; }
+      .traffic-card { grid-column: 1; grid-row: auto; }
+      .containers-card { grid-column: 1; grid-row: auto; }
+      .history-card { grid-column: 1; }
+      header { padding: 14px 16px; }
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="aws-badge">AWS</span>
+    <h1>ECS <span>Canary</span> Deployment — Live Demo</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div class="controls">
+      <span class="interval-label">
+        Poll interval:
+        <select class="interval-select" id="intervalSelect">
+          <option value="500">500ms</option>
+          <option value="800" selected>800ms</option>
+          <option value="1500">1.5s</option>
+          <option value="2000">2s</option>
+        </select>
+      </span>
+      <button class="btn" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+      <button class="btn danger" onclick="clearHistory()">✕ Clear</button>
+    </div>
+    <div class="live-dot" id="liveDot">LIVE</div>
+  </div>
+</header>
+
+<main>
+  <!-- ── Current Request Panel ── -->
+  <div class="card current-request">
+    <div class="card-title">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+      Latest Response
+    </div>
+
+    <div id="versionBadge" class="version-badge v1">
+      <span id="badgeType">● STABLE</span>
+    </div>
+
+    <div id="versionDisplay" class="version-display v1" title="Software version">v1.0.0</div>
+    <div id="versionType" class="version-type" style="color:var(--v1)">Stable Release</div>
+
+    <div class="divider"></div>
+
+    <div class="meta-row">
+      <div class="meta-item">
+        <div class="meta-label">Container ID</div>
+        <div class="meta-value highlight" id="containerId">—</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Build Time</div>
+        <div class="meta-value" id="buildTime">—</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Container Uptime</div>
+        <div class="meta-value" id="uptime">—</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Requests (this container)</div>
+        <div class="meta-value" id="reqCount">—</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Response Time</div>
+        <div class="meta-value" id="responseTime">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Traffic Distribution ── -->
+  <div class="card traffic-card">
+    <div class="card-title" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="2" y="9" width="3" height="5"/><rect x="6.5" y="5" width="3" height="9"/><rect x="11" y="2" width="3" height="12"/></svg>
+        Traffic Distribution
+      </span>
+      <span id="totalRequests" style="color:var(--text);font-size:12px;font-weight:700;letter-spacing:0;">0 requests</span>
+    </div>
+
+    <div class="split-bar-wrap">
+      <div class="split-labels">
+        <span class="split-label v1" id="v1Label">Stable v1 — 0%</span>
+        <span class="split-label v2" id="v2Label">Canary v2 — 0%</span>
+      </div>
+      <div class="split-bar">
+        <div class="split-fill-v1" id="v1Bar" style="width:50%">
+          <span class="split-pct" id="v1Pct"></span>
+        </div>
+        <div class="split-fill-v2" id="v2Bar" style="width:50%">
+          <span class="split-pct" id="v2Pct"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-box-label">Total Requests</div>
+        <div class="stat-box-value" id="statTotal">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Stable (v1) hits</div>
+        <div class="stat-box-value v1" id="statV1">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Canary (v2) hits</div>
+        <div class="stat-box-value v2" id="statV2">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Container Nodes ── -->
+  <div class="card containers-card">
+    <div class="card-title">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="1" y="3" width="14" height="10" rx="2"/><path d="M5 3v10M11 3v10"/></svg>
+      Active Containers
+    </div>
+    <div id="paused-banner" class="paused-banner">⏸ Polling paused — container assignments may be stale</div>
+    <div class="containers-grid" id="containersGrid">
+      <div class="empty-state">Waiting for first request…</div>
+    </div>
+  </div>
+
+  <!-- ── Request History ── -->
+  <div class="card history-card">
+    <div class="card-title" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M1 8h14M8 1l5 7-5 7"/></svg>
+        Request History (newest → left)
+      </span>
+      <span style="font-size:11px;color:var(--muted);">Hover a pill for details</span>
+    </div>
+    <div class="history-stream" id="historyStream">
+      <div class="empty-state">Waiting for first request…</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>AWS ECS Canary Deployment Demo &mdash; Traffic routed via ALB weighted target groups</span>
+  <span id="lastUpdated">—</span>
+</footer>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const MAX_HISTORY = 120;
+  let history = [];               // [{version, containerId, color, type, ts, ms}]
+  let containers = new Map();     // containerId → {version, type, color, count, lastActive}
+  let counts = { v1: 0, v2: 0 };
+  let paused = false;
+  let intervalId = null;
+  let pollMs = 800;
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const versionDisplay  = $('versionDisplay');
+  const versionType     = $('versionType');
+  const versionBadge    = $('versionBadge');
+  const badgeType       = $('badgeType');
+  const containerId     = $('containerId');
+  const buildTimeEl     = $('buildTime');
+  const uptimeEl        = $('uptime');
+  const reqCountEl      = $('reqCount');
+  const responseTimeEl  = $('responseTime');
+  const v1Bar           = $('v1Bar');
+  const v2Bar           = $('v2Bar');
+  const v1Pct           = $('v1Pct');
+  const v2Pct           = $('v2Pct');
+  const v1Label         = $('v1Label');
+  const v2Label         = $('v2Label');
+  const statTotal       = $('statTotal');
+  const statV1          = $('statV1');
+  const statV2          = $('statV2');
+  const totalRequests   = $('totalRequests');
+  const containersGrid  = $('containersGrid');
+  const historyStream   = $('historyStream');
+  const liveDot         = $('liveDot');
+  const lastUpdated     = $('lastUpdated');
+
+  // ── Polling ────────────────────────────────────────────────────────────────
+  async function poll() {
+    if (paused) return;
+    const t0 = performance.now();
+    try {
+      const res = await fetch('/api/info?_=' + Date.now(), { cache: 'no-store' });
+      const ms = Math.round(performance.now() - t0);
+      if (!res.ok) return;
+      const data = await res.json();
+      onData(data, ms);
+    } catch (_) {
+      liveDot.textContent = 'OFFLINE';
+      liveDot.style.color = '#ef4444';
+    }
+  }
+
+  function startPolling(ms) {
+    if (intervalId) clearInterval(intervalId);
+    pollMs = ms;
+    intervalId = setInterval(poll, pollMs);
+    poll(); // immediate first
+  }
+
+  // ── Data handler ───────────────────────────────────────────────────────────
+  function onData(data, ms) {
+    liveDot.textContent = 'LIVE';
+    liveDot.style.color = 'var(--green)';
+
+    const isV2 = data.version === 'v2';
+    const cls  = isV2 ? 'v2' : 'v1';
+    const col  = data.color;
+
+    // ── Current request panel ──
+    versionDisplay.className = 'version-display ' + cls + ' flash';
+    versionDisplay.textContent = data.versionLabel;
+    versionDisplay.style.color = col;
+    versionDisplay.style.textShadow = `0 0 40px ${col}66`;
+
+    versionBadge.className = 'version-badge ' + cls;
+    badgeType.textContent  = isV2 ? '◆ CANARY' : '● STABLE';
+
+    versionType.textContent = isV2 ? 'Canary Release' : 'Stable Release';
+    versionType.style.color = col;
+
+    containerId.textContent  = data.containerId;
+    containerId.className    = 'meta-value highlight flash';
+    buildTimeEl.textContent  = formatDate(data.buildTime);
+    uptimeEl.textContent     = formatUptime(data.uptime);
+    reqCountEl.textContent   = `${data.requestCount.toLocaleString()} req${data.requestCount !== 1 ? 's' : ''}`;
+    responseTimeEl.textContent = `${ms} ms`;
+
+    lastUpdated.textContent  = 'Last updated: ' + new Date().toLocaleTimeString();
+
+    // ── Counts ──
+    counts[data.version === 'v2' ? 'v2' : 'v1']++;
+    updateDistribution();
+
+    // ── Container tracking ──
+    const prev = containers.get(data.containerId);
+    containers.set(data.containerId, {
+      version: data.version,
+      type: data.type,
+      color: col,
+      count: (prev ? prev.count : 0) + 1,
+      lastActive: Date.now(),
+    });
+    renderContainers(data.containerId, cls);
+
+    // ── History ──
+    history.unshift({ version: data.version, containerId: data.containerId,
+                      color: col, type: data.type,
+                      ts: new Date().toLocaleTimeString(), ms });
+    if (history.length > MAX_HISTORY) history.pop();
+    renderHistory();
+
+    // Remove flash class after animation
+    setTimeout(() => {
+      versionDisplay.classList.remove('flash');
+      containerId.classList.remove('flash');
+    }, 300);
+  }
+
+  // ── Distribution bar ──────────────────────────────────────────────────────
+  function updateDistribution() {
+    const total = counts.v1 + counts.v2;
+    if (total === 0) return;
+    const p1 = Math.round((counts.v1 / total) * 100);
+    const p2 = 100 - p1;
+
+    v1Bar.style.width = p1 + '%';
+    v2Bar.style.width = p2 + '%';
+    v1Pct.textContent = p1 > 8 ? p1 + '%' : '';
+    v2Pct.textContent = p2 > 8 ? p2 + '%' : '';
+    v1Label.textContent = `Stable v1 — ${p1}%`;
+    v2Label.textContent = `Canary v2 — ${p2}%`;
+    statTotal.textContent   = total.toLocaleString();
+    statV1.textContent      = counts.v1.toLocaleString();
+    statV2.textContent      = counts.v2.toLocaleString();
+    totalRequests.textContent = total.toLocaleString() + ' request' + (total !== 1 ? 's' : '');
+  }
+
+  // ── Container nodes ───────────────────────────────────────────────────────
+  function renderContainers(activeId, activeCls) {
+    if (containers.size === 0) {
+      containersGrid.innerHTML = '<div class="empty-state">Waiting for first request…</div>';
+      return;
+    }
+
+    // Build sorted: stable first, then canary; most active first within group
+    const sorted = [...containers.entries()].sort((a, b) => {
+      if (a[1].type !== b[1].type) return a[1].type === 'stable' ? -1 : 1;
+      return b[1].count - a[1].count;
+    });
+
+    containersGrid.innerHTML = '';
+    for (const [cid, info] of sorted) {
+      const isActive = cid === activeId;
+      const cls = info.version === 'v2' ? 'v2' : 'v1';
+      const activeClass = isActive ? `active-${cls}` : '';
+      const node = document.createElement('div');
+      node.className = `container-node ${cls} ${activeClass}`;
+      node.innerHTML = `
+        <div class="node-header">
+          <span class="node-type-badge ${info.type}">${info.type.toUpperCase()}</span>
+          <span class="node-req-count">${info.count} req${info.count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="node-id ${isActive ? 'active' : ''}">${cid}</div>
+        <div class="node-version" style="color:${info.color}">${info.version === 'v2' ? 'v2 — canary' : 'v1 — stable'}</div>
+      `;
+      containersGrid.appendChild(node);
+    }
+  }
+
+  // ── Request history pills ─────────────────────────────────────────────────
+  function renderHistory() {
+    if (history.length === 0) {
+      historyStream.innerHTML = '<div class="empty-state">Waiting for first request…</div>';
+      return;
+    }
+
+    // Only re-render newest pill (prepend)
+    const entry = history[0];
+    const cls = entry.version === 'v2' ? 'v2' : 'v1';
+    const pill = document.createElement('span');
+    pill.className = `req-pill ${cls}`;
+    pill.title = `${entry.ts} • ${entry.containerId} • ${entry.ms}ms`;
+    pill.innerHTML = `<span class="dot"></span>${entry.version} <span style="opacity:.5;font-weight:400;">${entry.ms}ms</span>`;
+
+    if (historyStream.querySelector('.empty-state')) {
+      historyStream.innerHTML = '';
+    }
+
+    // Prepend new pill
+    historyStream.insertBefore(pill, historyStream.firstChild);
+
+    // Trim excess pills from DOM
+    while (historyStream.children.length > MAX_HISTORY) {
+      historyStream.removeChild(historyStream.lastChild);
+    }
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  function togglePause() {
+    paused = !paused;
+    $('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+    $('paused-banner').classList.toggle('visible', paused);
+    liveDot.textContent = paused ? 'PAUSED' : 'LIVE';
+    liveDot.style.color = paused ? '#f59e0b' : 'var(--green)';
+  }
+
+  function clearHistory() {
+    history = [];
+    counts = { v1: 0, v2: 0 };
+    containers.clear();
+    historyStream.innerHTML = '<div class="empty-state">Waiting for first request…</div>';
+    containersGrid.innerHTML = '<div class="empty-state">Waiting for first request…</div>';
+    updateDistribution();
+  }
+
+  $('intervalSelect').addEventListener('change', e => {
+    startPolling(parseInt(e.target.value));
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function formatDate(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  }
+
+  function formatUptime(secs) {
+    if (secs == null) return '—';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  startPolling(pollMs);
+</script>
+
+</body>
+</html>

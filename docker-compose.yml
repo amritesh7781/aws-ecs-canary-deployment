@@ -1,0 +1,79 @@
+services:
+
+  # ── Stable (v1) — two replicas to simulate a real ECS service with multiple tasks
+  # Run ./build.sh first, or use 'docker compose up --build' to build inline.
+  app-v1-a:
+    image: canary-demo:v1   # built by ./build.sh
+    build:
+      context: ./app
+      args:
+        VERSION: v1
+        VERSION_LABEL: "1.0.0"
+        BUILD_TIME: "${BUILD_TIME:-}"
+    environment:
+      VERSION: v1
+      VERSION_LABEL: "1.0.0"
+    networks: [canary-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  app-v1-b:
+    image: canary-demo:v1   # same image, distinct container = distinct hostname
+    build:
+      context: ./app
+      args:
+        VERSION: v1
+        VERSION_LABEL: "1.0.0"
+        BUILD_TIME: "${BUILD_TIME:-}"
+    environment:
+      VERSION: v1
+      VERSION_LABEL: "1.0.0"
+    networks: [canary-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Canary (v2) — single replica simulating a new canary task
+  app-v2:
+    image: canary-demo:v2   # built by ./build.sh
+    build:
+      context: ./app
+      args:
+        VERSION: v2
+        VERSION_LABEL: "2.0.0"
+        BUILD_TIME: "${BUILD_TIME:-}"
+    environment:
+      VERSION: v2
+      VERSION_LABEL: "2.0.0"
+    networks: [canary-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Nginx — weighted load balancer (mimics ALB target groups)
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app-v1-a
+      - app-v1-b
+      - app-v2
+    networks: [canary-net]
+    restart: unless-stopped
+
+networks:
+  canary-net:
+    driver: bridge

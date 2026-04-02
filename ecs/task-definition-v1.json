@@ -1,0 +1,41 @@
+{
+  "family": "canary-demo-stable",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "canary-demo",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/canary-demo:v1",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "VERSION",       "value": "v1" },
+        { "name": "VERSION_LABEL", "value": "1.0.0" },
+        { "name": "BUILD_TIME",    "value": "2026-04-02T00:00:00Z" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"],
+        "interval": 15,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/canary-demo",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "stable"
+        }
+      },
+      "essential": true
+    }
+  ]
+}
