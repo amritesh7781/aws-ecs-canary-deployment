@@ -7,8 +7,19 @@ const app = express();
 const VERSION = process.env.VERSION || 'v1';
 const VERSION_LABEL = process.env.VERSION_LABEL || '1.0.0';
 const BUILD_TIME = process.env.BUILD_TIME || new Date().toISOString();
-const SERVICE_COLOR = VERSION === 'v1' ? '#3b82f6' : '#f59e0b';
-const SERVICE_TYPE = VERSION === 'v1' ? 'stable' : 'canary';
+
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 85%, 60%)`;
+}
+
+const SERVICE_COLOR = VERSION === 'v1' ? '#3b82f6' : 
+                      VERSION === 'v2' ? '#f59e0b' : stringToColor(VERSION);
+const SERVICE_TYPE = 'release';
 const CONTAINER_ID = os.hostname();
 
 // Per-container request counter
@@ -26,6 +37,8 @@ app.get('/api/info', (req, res) => {
     requestCount,
     timestamp: new Date().toISOString(),
     uptime: Math.round(process.uptime()),
+    dbPassword: process.env.DB_PASSWORD || 'Not set',
+    apiKeys: process.env.API_KEYS || 'Not set',
   });
 });
 

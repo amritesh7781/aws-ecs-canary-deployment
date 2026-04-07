@@ -626,6 +626,14 @@
         <div class="meta-label">Response Time</div>
         <div class="meta-value" id="responseTime">—</div>
       </div>
+      <div class="meta-item">
+        <div class="meta-label">DB Password</div>
+        <div class="meta-value" id="dbPassword">—</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">API Keys</div>
+        <div class="meta-value" id="apiKeys">—</div>
+      </div>
     </div>
   </div>
 
@@ -707,7 +715,8 @@
   const MAX_HISTORY = 120;
   let history = [];               // [{version, containerId, color, type, ts, ms}]
   let containers = new Map();     // containerId → {version, type, color, count, lastActive}
-  let counts = { v1: 0, v2: 0 };
+  let counts = {};
+  let versionColors = {};
   let paused = false;
   let intervalId = null;
   let pollMs = 800;
@@ -723,15 +732,9 @@
   const uptimeEl        = $('uptime');
   const reqCountEl      = $('reqCount');
   const responseTimeEl  = $('responseTime');
-  const v1Bar           = $('v1Bar');
-  const v2Bar           = $('v2Bar');
-  const v1Pct           = $('v1Pct');
-  const v2Pct           = $('v2Pct');
-  const v1Label         = $('v1Label');
-  const v2Label         = $('v2Label');
+  const dbPasswordEl    = $('dbPassword');
+  const apiKeysEl       = $('apiKeys');
   const statTotal       = $('statTotal');
-  const statV1          = $('statV1');
-  const statV2          = $('statV2');
   const totalRequests   = $('totalRequests');
   const containersGrid  = $('containersGrid');
   const historyStream   = $('historyStream');
@@ -771,15 +774,18 @@
     const col  = data.color;
 
     // ── Current request panel ──
-    versionDisplay.className = 'version-display ' + cls + ' flash';
+    versionDisplay.className = "version-display flash";
     versionDisplay.textContent = data.versionLabel;
     versionDisplay.style.color = col;
     versionDisplay.style.textShadow = `0 0 40px ${col}66`;
 
-    versionBadge.className = 'version-badge ' + cls;
-    badgeType.textContent  = isV2 ? '◆ CANARY' : '● STABLE';
+    versionBadge.className = "version-badge";
+    versionBadge.style.background = col + "1e";
+    versionBadge.style.border = "1px solid " + col;
+    versionBadge.style.color = col;
+    badgeType.innerHTML = `◆ ${data.version.toUpperCase()}`;
 
-    versionType.textContent = isV2 ? 'Canary Release' : 'Stable Release';
+    versionType.textContent = `${data.version} Release`;
     versionType.style.color = col;
 
     containerId.textContent  = data.containerId;
@@ -788,11 +794,14 @@
     uptimeEl.textContent     = formatUptime(data.uptime);
     reqCountEl.textContent   = `${data.requestCount.toLocaleString()} req${data.requestCount !== 1 ? 's' : ''}`;
     responseTimeEl.textContent = `${ms} ms`;
+    dbPasswordEl.textContent = data.dbPassword;
+    apiKeysEl.textContent = data.apiKeys;
 
     lastUpdated.textContent  = 'Last updated: ' + new Date().toLocaleTimeString();
 
     // ── Counts ──
-    counts[data.version === 'v2' ? 'v2' : 'v1']++;
+    counts[data.version] = (counts[data.version] || 0) + 1;
+    versionColors[data.version] = col;
     updateDistribution();
 
     // ── Container tracking ──
@@ -822,21 +831,64 @@
 
   // ── Distribution bar ──────────────────────────────────────────────────────
   function updateDistribution() {
-    const total = counts.v1 + counts.v2;
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
     if (total === 0) return;
-    const p1 = Math.round((counts.v1 / total) * 100);
-    const p2 = 100 - p1;
+    
+    // Update split bar
+    let splitBar = document.querySelector('.split-bar');
+    let splitLabels = document.querySelector('.split-labels');
+    if(splitBar) splitBar.innerHTML = '';
+    if(splitLabels) splitLabels.innerHTML = '';
+    
+    // Update stats grid
+    let statGrid = document.querySelector('.stat-grid');
+    if(statGrid) {
+      statGrid.innerHTML = `<div class="stat-box">
+        <div class="stat-box-label">Total Requests</div>
+        <div class="stat-box-value">${total.toLocaleString()}</div>
+      </div>`;
+    }
+      
+    // Sort versions by name
+    const versions = Object.keys(counts).sort();
+    
+    versions.forEach(v => {
+      const c = counts[v];
+      const p = (c / total) * 100;
+      const pctDisplay = Math.round(p);
+      const col = versionColors[v] || '#ffffff';
+      
+      // Label
+      if(splitLabels) {
+        const lbl = document.createElement('span');
+        lbl.className = 'split-label';
+        lbl.style.color = col;
+        lbl.textContent = `${v} — ${pctDisplay}%`;
+        splitLabels.appendChild(lbl);
+      }
+      
+      // Bar segment
+      if(splitBar) {
+        const seg = document.createElement('div');
+        seg.className = 'split-fill-v1'; // reuse CSS transition property class
+        seg.style.background = `linear-gradient(90deg, ${col}80, ${col})`;
+        seg.style.width = p + '%';
+        if (pctDisplay > 8) {
+          seg.innerHTML = `<span class="split-pct">${pctDisplay}%</span>`;
+        }
+        splitBar.appendChild(seg);
+      }
+      
+      // Stat box
+      if(statGrid) {
+        statGrid.innerHTML += `<div class="stat-box">
+          <div class="stat-box-label">${v} hits</div>
+          <div class="stat-box-value" style="color:${col}">${c.toLocaleString()}</div>
+        </div>`;
+      }
+    });
 
-    v1Bar.style.width = p1 + '%';
-    v2Bar.style.width = p2 + '%';
-    v1Pct.textContent = p1 > 8 ? p1 + '%' : '';
-    v2Pct.textContent = p2 > 8 ? p2 + '%' : '';
-    v1Label.textContent = `Stable v1 — ${p1}%`;
-    v2Label.textContent = `Canary v2 — ${p2}%`;
-    statTotal.textContent   = total.toLocaleString();
-    statV1.textContent      = counts.v1.toLocaleString();
-    statV2.textContent      = counts.v2.toLocaleString();
-    totalRequests.textContent = total.toLocaleString() + ' request' + (total !== 1 ? 's' : '');
+    if(totalRequests) totalRequests.textContent = total.toLocaleString() + ' request' + (total !== 1 ? 's' : '');
   }
 
   // ── Container nodes ───────────────────────────────────────────────────────
@@ -855,17 +907,25 @@
     containersGrid.innerHTML = '';
     for (const [cid, info] of sorted) {
       const isActive = cid === activeId;
-      const cls = info.version === 'v2' ? 'v2' : 'v1';
-      const activeClass = isActive ? `active-${cls}` : '';
       const node = document.createElement('div');
-      node.className = `container-node ${cls} ${activeClass}`;
+      
+      const borderColor = isActive ? info.color : info.color + '40';
+      const bg = isActive ? info.color + '1e' : 'var(--surface-2)';
+      const shadow = isActive ? `0 0 20px ${info.color}59` : 'none';
+
+      node.className = 'container-node';
+      node.style.borderColor = borderColor;
+      node.style.background = bg;
+      node.style.boxShadow = shadow;
+      if (isActive) node.classList.add('flash');
+      
       node.innerHTML = `
         <div class="node-header">
-          <span class="node-type-badge ${info.type}">${info.type.toUpperCase()}</span>
+          <span class="node-type-badge" style="background:${info.color}33;color:${info.color}">${info.version.toUpperCase()}</span>
           <span class="node-req-count">${info.count} req${info.count !== 1 ? 's' : ''}</span>
         </div>
         <div class="node-id ${isActive ? 'active' : ''}">${cid}</div>
-        <div class="node-version" style="color:${info.color}">${info.version === 'v2' ? 'v2 — canary' : 'v1 — stable'}</div>
+        <div class="node-version" style="color:${info.color}">${info.version}</div>
       `;
       containersGrid.appendChild(node);
     }
@@ -880,11 +940,13 @@
 
     // Only re-render newest pill (prepend)
     const entry = history[0];
-    const cls = entry.version === 'v2' ? 'v2' : 'v1';
     const pill = document.createElement('span');
-    pill.className = `req-pill ${cls}`;
+    pill.className = 'req-pill';
+    pill.style.background = entry.color + '1e';
+    pill.style.border = '1px solid ' + entry.color + '4d';
+    pill.style.color = entry.color;
     pill.title = `${entry.ts} • ${entry.containerId} • ${entry.ms}ms`;
-    pill.innerHTML = `<span class="dot"></span>${entry.version} <span style="opacity:.5;font-weight:400;">${entry.ms}ms</span>`;
+    pill.innerHTML = `<span class="dot" style="background:${entry.color}"></span>${entry.version} <span style="opacity:.5;font-weight:400;">${entry.ms}ms</span>`;
 
     if (historyStream.querySelector('.empty-state')) {
       historyStream.innerHTML = '';
@@ -910,7 +972,8 @@
 
   function clearHistory() {
     history = [];
-    counts = { v1: 0, v2: 0 };
+    counts = {};
+    versionColors = {};
     containers.clear();
     historyStream.innerHTML = '<div class="empty-state">Waiting for first request…</div>';
     containersGrid.innerHTML = '<div class="empty-state">Waiting for first request…</div>';
