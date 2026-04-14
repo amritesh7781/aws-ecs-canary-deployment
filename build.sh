@@ -21,7 +21,7 @@
 set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
-REGISTRY="${REGISTRY:-canary-demo}"       # prefix / repo name
+REGISTRY="${REGISTRY:-amritesh/canary}"       # prefix / repo name
 PLATFORMS="linux/amd64,linux/arm64"
 BUILDER_NAME="canary-multiarch"
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
