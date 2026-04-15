@@ -20,6 +20,16 @@
         { "name": "VERSION_LABEL", "value": "1.0.0" },
         { "name": "BUILD_TIME",    "value": "2026-04-02T00:00:00Z" }
       ],
+      "secrets": [
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "/amritesh/canary/DB_PASSWORD"
+        },
+        {
+          "name": "API_KEYS",
+          "valueFrom": "/amritesh/canary/API_KEYS"
+        }
+      ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"],
         "interval": 15,
