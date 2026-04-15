@@ -1,5 +1,5 @@
 {
-  "family": "canary-demo-stable",
+  "family": "amritesh/canary-stable",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
@@ -7,8 +7,8 @@
   "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
-      "name": "canary-demo",
-      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/canary-demo:v1",
+      "name": "amritesh/canary",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/amritesh/canary:v1",
       "portMappings": [
         {
           "containerPort": 3000,
@@ -30,7 +30,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/canary-demo",
+          "awslogs-group": "/ecs/amritesh/canary",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "stable"
         }

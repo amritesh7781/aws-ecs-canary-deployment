@@ -1,5 +1,5 @@
 {
-  "name": "ecs-canary-demo",
+  "name": "ecs-amritesh/canary",
   "version": "1.0.0",
   "description": "AWS ECS Canary Deployment Demo App",
   "main": "server.js",

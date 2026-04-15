@@ -53,7 +53,7 @@ docker compose restart nginx
 ```bash
 ACCOUNT=123456789012
 REGION=us-east-1
-REPO=${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/canary-demo
+REPO=${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/amritesh/canary
 
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REPO
 
@@ -85,8 +85,8 @@ aws ecs register-task-definition --cli-input-json file://ecs/task-definition-v2.
 
 ### 3. Create two ECS services with separate ALB target groups
 
-- **canary-demo-stable** → Target Group A (stable)
-- **canary-demo-canary** → Target Group B (canary)
+- **amritesh/canary-stable** → Target Group A (stable)
+- **amritesh/canary-canary** → Target Group B (canary)
 
 Configure an ALB listener rule with weighted forwarding:
 - Target Group A weight: 80
