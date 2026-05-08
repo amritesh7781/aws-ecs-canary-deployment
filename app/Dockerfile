@@ -17,13 +17,13 @@ ARG BUILD_TIME
 ENV VERSION=${VERSION}
 ENV VERSION_LABEL=${VERSION_LABEL}
 ENV BUILD_TIME=${BUILD_TIME}
-ENV PORT=3000
+ENV PORT=8080
 ENV NODE_ENV=production
 
-EXPOSE 3000
+EXPOSE 8080
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://localhost:8080/health || exit 1
 
 USER node
 CMD ["node", "server.js"]
